@@ -1,8 +1,7 @@
-<p align="center">
-  <img src="src-tauri/icons/icon.svg" width="88" height="88" alt="Ferric icon">
-</p>
-
-<h1 align="center">Ferric</h1>
+<h1 align="center">
+  <img src="src-tauri/icons/icon.svg" width="48" height="48" align="top" alt="Ferric icon">
+  &nbsp;Ferric — YouTube Music for Windows
+</h1>
 
 <p align="center">
   Enjoy YouTube Music on your Windows desktop with a lightweight Rust app designed for significantly lower memory usage than Electron-based alternatives.
