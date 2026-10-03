@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Windows packages
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check the release tag
+        env:
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_REF_NAME: ${{ github.ref_name }}
+        run: |
+          $configuration = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          if ($env:RELEASE_REF.StartsWith('refs/tags/') -and $env:RELEASE_REF_NAME -cne "v$($configuration.version)") {
+            throw 'The tag must match the application version.'
+          }
+      - name: Install the pinned Rust toolchain
+        run: rustup show
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Check Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Run tests
+        run: cargo test --workspace --locked
+      - name: Install the pinned Tauri CLI
+        run: npm install --prefix target/build-tools --no-save --no-package-lock @tauri-apps/cli@2.12.1
+      - name: Build the portable app and installer
+        run: ./scripts/Build-Release.ps1 -WithInstaller -TauriCli ./target/build-tools/node_modules/.bin/tauri.cmd
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-release
+          path: |
+            target/releases/YouTube-Music-*-windows-x64.zip
+            target/releases/YouTube-Music-*-windows-x64-setup.exe
+            target/releases/*.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  publish:
+    name: Publish the tagged release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-release
+          path: release
+      - name: Publish packages and checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" release/* --verify-tag \
+            --title "Ferric $RELEASE_TAG" --generate-notes
