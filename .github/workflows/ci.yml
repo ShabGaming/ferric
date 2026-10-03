@@ -39,7 +39,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: YouTube-Music-windows-x64
-          path: target/releases/YouTube-Music-*-windows-x64.zip*
+          path: target/releases/YouTube-Music-*-windows-x64.zip
           if-no-files-found: error
           retention-days: 14
           compression-level: 0

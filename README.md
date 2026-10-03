@@ -58,6 +58,8 @@ You need **64-bit Windows 10 or Windows 11**, an internet connection, and the [M
 
 You may see an unknown-publisher notice from Windows because your download is not code-signed.
 
+You can view each download's SHA-256 checksum beside its asset on the GitHub release page.
+
 ### Portable app
 
 1. Download `YouTube-Music-1.0.0-windows-x64.zip` from [Releases](https://github.com/ShabGaming/ferric/releases).
@@ -106,7 +108,7 @@ To build your portable release package, quit your running copy and run:
 .\scripts\Build-Release.ps1
 ```
 
-You will find your executable at `target/releases/1.0.0/YouTube Music.exe` and your versioned ZIP with its SHA-256 checksum under `target/releases/`. You can also build only the executable with `cargo build -p ferric --release --locked`; your Cargo output is `target/release/youtube-music.exe`.
+You will find your executable at `target/releases/1.0.0/YouTube Music.exe` and your versioned ZIP under `target/releases/`. You can also build only the executable with `cargo build -p ferric --release --locked`; your Cargo output is `target/release/youtube-music.exe`.
 
 To also build your Windows installer, install the pinned Tauri CLI and run:
 
@@ -115,7 +117,7 @@ cargo install tauri-cli --version 2.12.1 --locked
 .\scripts\Build-Release.ps1 -WithInstaller
 ```
 
-You will find your setup executable and its checksum alongside your ZIP in `target/releases/`.
+You will find your setup executable alongside your ZIP in `target/releases/`.
 
 ## Contributing
 

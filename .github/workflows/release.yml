@@ -52,7 +52,6 @@ jobs:
           path: |
             target/releases/YouTube-Music-*-windows-x64.zip
             target/releases/YouTube-Music-*-windows-x64-setup.exe
-            target/releases/*.sha256
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
@@ -69,11 +68,11 @@ jobs:
         with:
           name: windows-release
           path: release
-      - name: Publish packages and checksums
+      - name: Publish packages
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$RELEASE_TAG" release/* --verify-tag \
+          gh release create "$RELEASE_TAG" release/*.zip release/*-setup.exe --verify-tag \
             --title "Ferric $RELEASE_TAG" --generate-notes

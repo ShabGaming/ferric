@@ -48,8 +48,6 @@ try {
         $artifacts += $installer
     }
     foreach ($artifact in $artifacts) {
-        $checksum = Get-FileHash -LiteralPath $artifact -Algorithm SHA256
-        "{0}  {1}" -f $checksum.Hash.ToLowerInvariant(), (Split-Path -Leaf $artifact) | Set-Content -LiteralPath "$artifact.sha256" -Encoding ascii
         Write-Output $artifact
     }
 }
