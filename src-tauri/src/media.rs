@@ -1,5 +1,5 @@
-use serde::Deserialize;
-use tauri::{Url, WebviewWindow};
+use crate::{AppState, playback};
+use tauri::{Manager, WebviewWindow};
 use webview2_com::{WebMessageReceivedEventHandler, take_pwstr};
 use windows::{
     Foundation::{TypedEventHandler, Uri},
@@ -12,51 +12,8 @@ use windows::{
     core::{HSTRING, PWSTR, factory},
 };
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Update {
-    kind: String,
-    title: String,
-    artist: String,
-    album: String,
-    artwork: String,
-    active: bool,
-    playing: bool,
-}
-
-fn parse(source: &str, message: &str) -> Option<Update> {
-    if Url::parse(source).ok()?.origin().ascii_serialization() != "https://music.youtube.com"
-        || message.len() > 16_384
-    {
-        return None;
-    }
-    let update: Update = serde_json::from_str(message).ok()?;
-    if update.kind != "ferric-media"
-        || [
-            &update.title,
-            &update.artist,
-            &update.album,
-            &update.artwork,
-        ]
-        .iter()
-        .any(|field| field.len() > 2048)
-    {
-        return None;
-    }
-    Some(update)
-}
-
 fn artwork_uri(value: &str) -> Option<Uri> {
-    let url = Url::parse(value).ok()?;
-    let host = url.host_str()?;
-    if url.scheme() != "https"
-        || url.port_or_known_default() != Some(443)
-        || !url.username().is_empty()
-        || url.password().is_some()
-        || !["ytimg.com", "googleusercontent.com", "ggpht.com"]
-            .iter()
-            .any(|domain| host == *domain || host.ends_with(&format!(".{domain}")))
-    {
+    if !playback::valid_artwork(value) {
         return None;
     }
     Uri::CreateUri(&HSTRING::from(value)).ok()
@@ -82,6 +39,17 @@ impl Drop for MediaSession {
 }
 
 pub fn attach(window: &WebviewWindow) -> Result<MediaSession, Box<dyn std::error::Error>> {
+    let session = create_controls(window);
+    // Install the metadata bridge even when Windows media controls are unavailable.
+    let native = session
+        .as_ref()
+        .ok()
+        .map(|session| session.controls.clone());
+    attach_bridge(window, native)?;
+    session
+}
+
+fn create_controls(window: &WebviewWindow) -> Result<MediaSession, Box<dyn std::error::Error>> {
     let interop: ISystemMediaTransportControlsInterop =
         factory::<SystemMediaTransportControls, _>()?;
     // I bind the controls to my own top-level window, keeping WebView2 out of the app identity.
@@ -110,15 +78,21 @@ pub fn attach(window: &WebviewWindow) -> Result<MediaSession, Box<dyn std::error
         Ok(())
     });
     let button_token = controls.ButtonPressed(&handler)?;
-    let native = controls.clone();
+    Ok(MediaSession {
+        controls,
+        button_token,
+    })
+}
+
+fn attach_bridge(
+    window: &WebviewWindow,
+    native: Option<SystemMediaTransportControls>,
+) -> tauri::Result<()> {
+    let app = window.app_handle().clone();
     window.with_webview(move |webview| {
-        let updater = match native.DisplayUpdater() {
-            Ok(updater) => updater,
-            Err(error) => {
-                eprintln!("Could not initialize media metadata: {error}");
-                return;
-            }
-        };
+        let updater = native
+            .as_ref()
+            .and_then(|native| native.DisplayUpdater().ok());
         let mut previous = String::new();
         let handler = WebMessageReceivedEventHandler::create(Box::new(move |_, args| {
             let Some(args) = args else {
@@ -135,7 +109,11 @@ pub fn attach(window: &WebviewWindow) -> Result<MediaSession, Box<dyn std::error
                 args.TryGetWebMessageAsString(&mut message)?;
             }
             let message = take_pwstr(message);
-            let Some(update) = parse(&source, &message) else {
+            let Some(update) = playback::parse(&source, &message) else {
+                return Ok(());
+            };
+            app.state::<AppState>().discord.update(update.clone());
+            let (Some(native), Some(updater)) = (native.as_ref(), updater.as_ref()) else {
                 return Ok(());
             };
             native.SetIsEnabled(update.active)?;
@@ -180,10 +158,6 @@ pub fn attach(window: &WebviewWindow) -> Result<MediaSession, Box<dyn std::error
         if let Err(error) = result {
             eprintln!("Could not attach the media bridge: {error}");
         }
-    })?;
-    Ok(MediaSession {
-        controls,
-        button_token,
     })
 }
 
@@ -194,24 +168,24 @@ mod tests {
     #[test]
     fn messages_require_the_music_origin_and_bounded_metadata() {
         let message = r#"{"kind":"ferric-media","title":"Track","artist":"Artist","album":"","artwork":"","active":true,"playing":true}"#;
-        assert!(parse("https://music.youtube.com/", message).is_some());
+        assert!(playback::parse("https://music.youtube.com/", message).is_some());
         for source in [
             "https://music.youtube.com.evil.test/",
             "http://music.youtube.com/",
             "https://music.youtube.com:444/",
         ] {
-            assert!(parse(source, message).is_none());
+            assert!(playback::parse(source, message).is_none());
         }
-        assert!(parse("https://music.youtube.com/", &"x".repeat(16_385)).is_none());
+        assert!(playback::parse("https://music.youtube.com/", &"x".repeat(16_385)).is_none());
         assert!(
-            parse(
+            playback::parse(
                 "https://music.youtube.com/",
                 &message.replace("Track", &"x".repeat(2049))
             )
             .is_none()
         );
         assert!(
-            parse(
+            playback::parse(
                 "https://music.youtube.com/",
                 &message.replace("ferric-media", "settings")
             )

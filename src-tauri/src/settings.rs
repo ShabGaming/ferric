@@ -5,12 +5,14 @@ use std::{fs, io, path::Path};
 #[serde(default)]
 pub struct Settings {
     pub close_to_tray: bool,
+    pub discord_rich_presence: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
             close_to_tray: true,
+            discord_rich_presence: false,
         }
     }
 }
@@ -44,6 +46,10 @@ mod tests {
     fn missing_fields_keep_close_to_tray_enabled() {
         let settings: Settings = serde_json::from_str("{}").unwrap();
         assert!(settings.close_to_tray);
+        assert!(!settings.discord_rich_presence);
+        let existing: Settings = serde_json::from_str(r#"{"close_to_tray":false}"#).unwrap();
+        assert!(!existing.close_to_tray);
+        assert!(!existing.discord_rich_presence);
     }
 
     #[test]
@@ -55,10 +61,12 @@ mod tests {
         assert!(Settings::load(&path).unwrap().close_to_tray);
         Settings {
             close_to_tray: false,
+            discord_rich_presence: true,
         }
         .save(&path)
         .unwrap();
         assert!(!Settings::load(&path).unwrap().close_to_tray);
+        assert!(Settings::load(&path).unwrap().discord_rich_presence);
         Settings::default().save(&path).unwrap();
         assert!(Settings::load(&path).unwrap().close_to_tray);
         fs::write(&path, "invalid").unwrap();

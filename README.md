@@ -38,6 +38,7 @@ You use the app as provided, without warranty, under the [MIT license](LICENSE).
 - **System tray.** Close your window to keep music playing, then click the tray icon to return.
 - **Startup on your terms.** Enable Windows startup to launch into the tray; open your player when you need it.
 - **Windows media controls.** Control your music with play, pause, previous, and next buttons in the Windows media panel.
+- **Optional Discord Rich Presence.** Share your playing track, artist, artwork, and progress through your Discord desktop client.
 - **Persistent sign-in.** Keep your account session across app restarts with a dedicated WebView2 profile.
 - **One running instance.** Launch again to restore your existing player.
 - **A lightweight desktop shell.** Use your installed WebView2 runtime, with a lower memory target while your player is in the background.
@@ -77,15 +78,26 @@ You can change your preferences through the window's **Settings** menu or by rig
 | Open YouTube Music | Restore your player window | — |
 | Run on Windows startup | Start in your tray when you sign in to Windows | Off |
 | Close to tray | Keep your music playing when you close the window | On |
+| Discord Rich Presence | Share your current track on your Discord profile | Off |
 | Exit | Shut down your player and its WebView2 processes | — |
 
 You can click your tray icon to reopen the player, or choose **YouTube Music > Exit** in the window menu to quit. Disable **Close to tray** if you prefer to exit with the window's close button.
+
+### Discord Rich Presence
+
+Open the Discord desktop client and sign in, then enable **Settings > Discord Rich Presence** in the player or tray menu. Ferric shares the playing track's title, artist, album artwork, and progress when available. A **Listen on YouTube Music** button links to the playing song when its identity is available, even while you browse other pages. Missing or rejected artwork falls back to the Ferric icon.
+
+The full card identifies the player as **YouTube Music (Ferric)**. The compact activity status under your name uses the current song title instead of the app name.
+
+Presence clears when you pause, finish playback, disable the option, or exit. It continues while music plays in the tray. Buffering and detected advertisements also clear the card. Unknown durations, including live streams, omit progress. Discord can start after Ferric or restart during playback; Ferric reconnects automatically, with retries spaced up to 30 seconds apart.
+
+This option is off by default, including after upgrading. It uses the local Discord client without asking for Discord tokens or an additional sign-in. Discord's **Activity Privacy** settings control whether other people see your activity. If the card does not appear, check those settings and make sure you are using the desktop client. Your own profile may not show actionable presence buttons; use another account to check the song link.
 
 ### Your data
 
 Your settings and sign-in profile stay under `%LOCALAPPDATA%\Ferric`:
 
-- `settings.json`: your close-to-tray preference.
+- `settings.json`: your close-to-tray and Discord Rich Presence preferences.
 - `webview/`: your WebView2 browser profile and account session.
 
 Your startup preference uses your Windows account's Run registry key. You can replace your executable with a newer build without discarding your existing profile. Run the new build once to refresh your Start menu shortcut and any enabled startup entry.
@@ -127,9 +139,12 @@ You can report bugs, suggest improvements, or submit a focused pull request. Bef
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
+node --test scripts/Test-MediaBridge.cjs
 ```
 
 For changes to playback or desktop behavior, also check your release build with sign-in, media buttons, tray playback, and window restoration. You can use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) prefixes, such as `feat:`, `fix:`, or `docs:`, with short imperative subjects.
+
+The JavaScript bridge tests use Node.js 18 or newer; the app and its build do not require Node.js. With Discord desktop running, you can explicitly run `cargo test -p ferric live_discord_smoke_test -- --ignored --nocapture` to check the Rust handshake, sample Listening activity, and clearing against the real client. This test briefly changes your presence and is skipped by the normal suite. For a two-minute visual card check, run `./scripts/Test-DiscordPresence.ps1` from PowerShell 7.
 
 ## License
 

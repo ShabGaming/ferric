@@ -5,9 +5,11 @@ compile_error!("Ferric currently targets Windows.");
 
 mod desktop;
 mod diagnostics;
+mod discord;
 mod identity;
 mod media;
 mod memory;
+mod playback;
 mod settings;
 mod startup;
 
@@ -25,6 +27,7 @@ struct AppState {
     media: Mutex<Option<media::MediaSession>>,
     settings: Mutex<settings::Settings>,
     settings_path: PathBuf,
+    discord: discord::Presence,
     normal_memory: bool,
     profile_memory: bool,
     profiling_started: AtomicBool,
@@ -59,6 +62,7 @@ fn run() -> tauri::Result<()> {
             let state = window.state::<AppState>();
             match event {
                 WindowEvent::Destroyed => {
+                    state.discord.clear();
                     state.media.lock().unwrap().take();
                 }
                 WindowEvent::CloseRequested { api, .. } => {
@@ -114,6 +118,7 @@ fn run() -> tauri::Result<()> {
                 settings::Settings::default()
             });
             app.manage(AppState {
+                discord: discord::Presence::new(settings.discord_rich_presence),
                 data_directory: directory,
                 media: Mutex::new(None),
                 settings: Mutex::new(settings),
@@ -144,5 +149,11 @@ fn run() -> tauri::Result<()> {
             }
             Ok(())
         })
-        .run(context)
+        .build(context)?
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                app.state::<AppState>().discord.shutdown();
+            }
+        });
+    Ok(())
 }

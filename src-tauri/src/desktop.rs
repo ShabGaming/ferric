@@ -44,6 +44,7 @@ pub fn create_window(app: &AppHandle) -> tauri::Result<()> {
     .on_page_load(|window, payload| {
         let state = window.state::<AppState>();
         if payload.event() == PageLoadEvent::Started {
+            state.discord.clear();
             if let Some(session) = state.media.lock().unwrap().as_ref() {
                 session.clear();
             }
@@ -127,7 +128,24 @@ pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
             .close_to_tray,
         None::<&str>,
     )?;
-    let settings_menu = Submenu::with_items(app, "Settings", true, &[&startup_item, &close_item])?;
+    let discord_item = CheckMenuItem::with_id(
+        app,
+        "discord-rich-presence",
+        "Discord Rich Presence",
+        true,
+        app.state::<AppState>()
+            .settings
+            .lock()
+            .unwrap()
+            .discord_rich_presence,
+        None::<&str>,
+    )?;
+    let settings_menu = Submenu::with_items(
+        app,
+        "Settings",
+        true,
+        &[&startup_item, &close_item, &discord_item],
+    )?;
     let exit_item = MenuItem::with_id(app, "exit", "Exit", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(app, &[&open_item, &settings_menu, &separator, &exit_item])?;
@@ -172,6 +190,32 @@ pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
                         let _ = close_item.set_checked(enabled);
                     }
                     Err(error) => report_error(&format!("Could not save settings: {error}")),
+                }
+            }
+            "discord-rich-presence" => {
+                let state = app.state::<AppState>();
+                let result = {
+                    let mut settings = state.settings.lock().unwrap();
+                    let mut updated = settings.clone();
+                    updated.discord_rich_presence = !updated.discord_rich_presence;
+                    updated.save(&state.settings_path).map(|()| {
+                        *settings = updated;
+                        settings.discord_rich_presence
+                    })
+                };
+                match result {
+                    Ok(enabled) => {
+                        state.discord.set_enabled(enabled);
+                        let _ = discord_item.set_checked(enabled);
+                        if enabled && let Some(window) = app.get_webview_window("music") {
+                            let _ = window.eval("window.__ferricMediaRefresh?.()");
+                        }
+                    }
+                    Err(error) => {
+                        let _ = discord_item
+                            .set_checked(state.settings.lock().unwrap().discord_rich_presence);
+                        report_error(&format!("Could not save settings: {error}"));
+                    }
                 }
             }
             _ => {}
