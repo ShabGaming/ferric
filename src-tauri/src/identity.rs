@@ -72,25 +72,41 @@ fn register_shortcut(identifier: &str, name: &str) -> Result<(), Box<dyn std::er
     let folder = PathBuf::from(programs).join("Ferric");
     fs::create_dir_all(&folder)?;
     let path = folder.join(format!("{name}.lnk"));
-    let filename = HSTRING::from(path.as_os_str());
     let executable = std::env::current_exe()?;
+    save_shortcut(&path, &executable, identifier, name)
+}
+
+fn save_shortcut(
+    path: &Path,
+    executable: &Path,
+    identifier: &str,
+    name: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let filename = HSTRING::from(path.as_os_str());
+    if path.exists() {
+        let link: IShellLinkW =
+            unsafe { CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER)? };
+        let file: IPersistFile = link.cast()?;
+        let properties: IPropertyStore = link.cast()?;
+        if unsafe { file.Load(&filename, STGM_READ) }.is_ok() {
+            let mut target = vec![0u16; 32_768];
+            let target_matches =
+                unsafe { link.GetPath(&mut target, std::ptr::null_mut(), SLGP_RAWPATH.0 as u32) }
+                    .is_ok()
+                    && Path::new(&String::from_utf16_lossy(
+                        &target[..target.iter().position(|c| *c == 0).unwrap_or(target.len())],
+                    )) == executable;
+            let identity_matches = unsafe { properties.GetValue(&PKEY_AppUserModel_ID) }
+                .is_ok_and(|value| value.to_string() == identifier);
+            if target_matches && identity_matches {
+                return Ok(());
+            }
+        }
+    }
+    // Release the read-only loaded shortcut before saving a replacement through a fresh object.
     let link: IShellLinkW = unsafe { CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER)? };
     let file: IPersistFile = link.cast()?;
     let properties: IPropertyStore = link.cast()?;
-    if path.exists() && unsafe { file.Load(&filename, STGM_READ) }.is_ok() {
-        let mut target = vec![0u16; 32_768];
-        let target_matches =
-            unsafe { link.GetPath(&mut target, std::ptr::null_mut(), SLGP_RAWPATH.0 as u32) }
-                .is_ok()
-                && Path::new(&String::from_utf16_lossy(
-                    &target[..target.iter().position(|c| *c == 0).unwrap_or(target.len())],
-                )) == executable;
-        let identity_matches = unsafe { properties.GetValue(&PKEY_AppUserModel_ID) }
-            .is_ok_and(|value| value.to_string() == identifier);
-        if target_matches && identity_matches {
-            return Ok(());
-        }
-    }
     let mut identity = PROPVARIANT::default();
     unsafe {
         // I allocate the string with COM's allocator; PROPVARIANT releases it on drop.
@@ -117,5 +133,29 @@ impl Drop for ComApartment {
         if self.0 {
             unsafe { CoUninitialize() };
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shortcut_can_switch_between_release_and_development_executables() {
+        unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) }
+            .ok()
+            .unwrap();
+        let _apartment = ComApartment(true);
+        let directory =
+            std::env::temp_dir().join(format!("ferric-shortcut-{}", std::process::id()));
+        fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("test.lnk");
+        let first = directory.join("release.exe");
+        let second = directory.join("debug.exe");
+        save_shortcut(&path, &first, "ferric.test", "Ferric test").unwrap();
+        save_shortcut(&path, &second, "ferric.test", "Ferric test").unwrap();
+        save_shortcut(&path, &second, "ferric.test", "Ferric test").unwrap();
+        fs::remove_file(path).unwrap();
+        fs::remove_dir(directory).unwrap();
     }
 }

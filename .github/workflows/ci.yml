@@ -29,6 +29,8 @@ jobs:
         run: rustup show
       - name: Check formatting
         run: cargo fmt --all -- --check
+      - name: Test playback metadata bridge
+        run: node --test scripts/Test-MediaBridge.cjs
       - name: Check Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Run tests
