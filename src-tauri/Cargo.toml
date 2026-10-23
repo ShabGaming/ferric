@@ -1,6 +1,6 @@
 [package]
 name = "ferric"
-version = "1.0.0"
+version = "1.1.0"
 description = "A lightweight YouTube Music desktop app for Windows"
 edition = "2024"
 rust-version = "1.90"

@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ShabGaming/ferric/releases"><img src="https://img.shields.io/badge/version-1.0.0-ff0033?style=flat-square" alt="Version 1.0.0"></a>
+  <a href="https://github.com/ShabGaming/ferric/releases"><img src="https://img.shields.io/badge/version-1.1.0-ff0033?style=flat-square" alt="Version 1.1.0"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT license"></a>
   <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/built_with-Rust-dea584?style=flat-square&amp;logo=rust" alt="Built with Rust"></a>
   <a href="#download"><img src="https://img.shields.io/badge/platform-Windows_x64-0078d4?style=flat-square" alt="Windows x64"></a>
@@ -53,7 +53,7 @@ You need **64-bit Windows 10 or Windows 11**, an internet connection, and the [M
 
 ### Installer
 
-1. Download `YouTube-Music-1.0.0-windows-x64-setup.exe` from [Releases](https://github.com/ShabGaming/ferric/releases).
+1. Download `YouTube-Music-1.1.0-windows-x64-setup.exe` from [Releases](https://github.com/ShabGaming/ferric/releases).
 2. Run the installer to install for your Windows account. You will be prompted to install WebView2 if you need it.
 3. Open **YouTube Music** from the **Ferric** folder in your Start menu and sign in.
 
@@ -63,7 +63,7 @@ You can view each download's SHA-256 checksum beside its asset on the GitHub rel
 
 ### Portable app
 
-1. Download `YouTube-Music-1.0.0-windows-x64.zip` from [Releases](https://github.com/ShabGaming/ferric/releases).
+1. Download `YouTube-Music-1.1.0-windows-x64.zip` from [Releases](https://github.com/ShabGaming/ferric/releases).
 2. Extract the ZIP to a folder you want to keep, such as `%LOCALAPPDATA%\Programs\Ferric`.
 3. Run **YouTube Music.exe** and sign in to your YouTube Music account.
 
@@ -120,7 +120,7 @@ To build your portable release package, quit your running copy and run:
 .\scripts\Build-Release.ps1
 ```
 
-You will find your executable at `target/releases/1.0.0/YouTube Music.exe` and your versioned ZIP under `target/releases/`. You can also build only the executable with `cargo build -p ferric --release --locked`; your Cargo output is `target/release/youtube-music.exe`.
+You will find your executable at `target/releases/1.1.0/YouTube Music.exe` and your versioned ZIP under `target/releases/`. You can also build only the executable with `cargo build -p ferric --release --locked`; your Cargo output is `target/release/youtube-music.exe`.
 
 To also build your Windows installer, install the pinned Tauri CLI and run:
 
