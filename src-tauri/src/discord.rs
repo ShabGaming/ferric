@@ -19,6 +19,7 @@ const DISPLAY_NAME: &str = "YouTube Music (Ferric)";
 const IO_TIMEOUT: Duration = Duration::from_secs(2);
 const UPDATE_INTERVAL: Duration = Duration::from_secs(5);
 const STALE_AFTER: Duration = Duration::from_secs(90);
+const END_GRACE: Duration = Duration::from_secs(10);
 const MAX_FRAME: usize = 65_536;
 
 #[derive(Clone, Default)]
@@ -35,13 +36,32 @@ struct Snapshot {
     unix_seconds: i64,
 }
 
+impl Snapshot {
+    // A hidden page's timers can be throttled, so a steadily playing song stays fresh until it should have ended.
+    fn expired(&self) -> bool {
+        let elapsed = self.received.elapsed();
+        if elapsed < STALE_AFTER {
+            return false;
+        }
+        let update = &self.update;
+        update
+            .position
+            .zip(update.duration)
+            .filter(|(position, duration)| *duration > 0.0 && position < duration)
+            .is_none_or(|(position, duration)| {
+                elapsed.as_secs_f64()
+                    >= (duration - position) / update.playback_rate + END_GRACE.as_secs_f64()
+            })
+    }
+}
+
 impl Desired {
     fn activity(&self) -> Option<Activity> {
         let track = self.track.as_ref()?;
         let update = &track.update;
         if !self.enabled
             || self.shutdown
-            || track.received.elapsed() >= STALE_AFTER
+            || track.expired()
             || !update.active
             || !update.playing
             || update.buffering
@@ -683,7 +703,10 @@ mod tests {
                 1 => track.update.active = false,
                 2 => track.update.buffering = true,
                 3 => track.update.ad = true,
-                4 => track.received -= STALE_AFTER,
+                4 => {
+                    track.received -= STALE_AFTER;
+                    track.update.duration = None;
+                }
                 5 => track.update.title = "  ".into(),
                 6 => state.enabled = false,
                 _ => state.shutdown = true,
@@ -693,6 +716,21 @@ mod tests {
         let bounded = text(&"界".repeat(100));
         assert!(bounded.len() <= 128);
         assert!(!text("a\nb").contains('\n'));
+    }
+
+    #[test]
+    fn quiet_pages_stay_fresh_until_the_song_should_have_ended() {
+        let mut state = desired();
+        let track = state.track.as_mut().unwrap();
+        track.received -= STALE_AFTER + Duration::from_secs(10); // 150s of the song remained when it was reported.
+        assert!(state.activity().is_some());
+        let track = state.track.as_mut().unwrap();
+        track.received -= Duration::from_secs(70);
+        assert!(state.activity().is_none());
+        let track = state.track.as_mut().unwrap();
+        track.received = Instant::now() - STALE_AFTER;
+        track.update.duration = None;
+        assert!(state.activity().is_none());
     }
 
     #[tokio::test]
