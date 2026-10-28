@@ -29,7 +29,7 @@ Reuse the existing `media.js` → WebView2 → Rust bridge. Keep its origin rest
 
 The implementation uses a small, tested IPC transport on the existing Tokio runtime dependency rather than `discord-rich-presence`. This gives the worker cancellable reads/writes, bounded timeouts, explicit READY and command acknowledgement checks, and ping/disconnect handling. Tokio's macros feature adds one compile-time dependency. No additional runtime service or SDK is required.
 
-The worker retains only the latest desired snapshot using a watch channel, spaces metadata publications at least five seconds apart within a connection, retries failures with a 1–30 second backoff, and expires snapshots after 90 seconds without reconciliation (checked at intervals up to 15 seconds). Clear operations bypass publication spacing and wait at most 500 ms for acknowledgement before disconnecting. Remote artwork rejected by Discord retries with the registered `ferric` asset.
+The worker retains only the latest desired snapshot using a watch channel, spaces metadata publications at least five seconds apart within a connection, retries failures with a 1–30 second backoff, and expires snapshots after 90 seconds without reconciliation, or, for a track with a known duration, once it should have ended plus a 10 second grace, so a throttled hidden page keeps its card (checked at intervals up to 15 seconds). Clear operations bypass publication spacing and wait at most 500 ms for acknowledgement before disconnecting. Remote artwork rejected by Discord retries with the registered `ferric` asset.
 
 ## Update policy
 
